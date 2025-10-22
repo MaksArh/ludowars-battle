@@ -14,4 +14,3 @@ export function Counter({ count }: CounterProps) {
     </div>
   );
 }
-
