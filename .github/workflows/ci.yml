@@ -64,12 +64,6 @@ jobs:
         working-directory: frontend
         run: npm run test:coverage
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./frontend/coverage/lcov.info
-          fail_ci_if_error: true
-
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
