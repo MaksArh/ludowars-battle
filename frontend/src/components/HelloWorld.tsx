@@ -10,4 +10,3 @@ export const HelloWorld = ({ name = 'World' }: HelloWorldProps) => {
     </div>
   );
 };
-
