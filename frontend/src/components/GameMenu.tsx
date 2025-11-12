@@ -3,7 +3,10 @@ interface GameMenuProps {
   onShowSettings?: () => void;
 }
 
-export const GameMenu = ({ onStartGame, onShowSettings }: GameMenuProps) => {
+export const GameMenu = ({
+  onStartGame,
+  onShowSettings,
+}: GameMenuProps) => {
   return (
     <div className="game-menu">
       <h2>Main Menu</h2>
@@ -12,4 +15,3 @@ export const GameMenu = ({ onStartGame, onShowSettings }: GameMenuProps) => {
     </div>
   );
 };
-
