@@ -29,3 +29,4 @@ Nakama будет доступен на:
 
 См. [architecture.md](../docs/architecture.md) для деталей архитектуры backend.
 
+

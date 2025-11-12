@@ -133,3 +133,4 @@ frontend/
 
 Все checks должны пройти для merge в main.
 
+
