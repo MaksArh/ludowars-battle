@@ -29,7 +29,7 @@ export const helperFunction2 = (a: number, b: number): number => {
 };
 
 export const helperFunction3 = (items: string[]): string[] => {
-  const filtered = items.filter((item) => item.length > 5);
+  const filtered = items.filter((item) => item.length >= 5);
   const mapped = filtered.map((item) => item.trim());
   return mapped.sort();
 };
