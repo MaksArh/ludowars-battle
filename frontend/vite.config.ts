@@ -10,9 +10,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
-    exclude: ['**/node_modules/**', '**/e2e/**', '**/tests/e2e/**'],
+    include: ['tests/unit/**/*.test.{ts,tsx}'],
     coverage: {
-      exclude: ['**/node_modules/**', '**/e2e/**', '**/tests/e2e/**'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       lines: 80,
