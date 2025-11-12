@@ -8,7 +8,7 @@ function App() {
 
   return (
     <div className="app">
-      <h1>Game Application</h1>
+      <h1>Ludowars Battle</h1>
       <p className="description">2D Multiplayer Platform Shooter</p>
 
       <Counter count={count} />
