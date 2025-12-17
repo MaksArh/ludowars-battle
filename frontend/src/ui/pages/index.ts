@@ -1,0 +1,12 @@
+export { LandingPage } from './LandingPage';
+export { LoginPage } from './LoginPage';
+export { RegisterPage } from './RegisterPage';
+export { MainMenuPage } from './MainMenuPage';
+export { LoadoutPage } from './LoadoutPage';
+export { MatchmakingPage } from './MatchmakingPage';
+export { GamePage } from './GamePage';
+export { ResultsPage } from './ResultsPage';
+export { ShopPage } from './ShopPage';
+export { ProfilePage } from './ProfilePage';
+export { LeaderboardPage } from './LeaderboardPage';
+export { SettingsPage } from './SettingsPage';
