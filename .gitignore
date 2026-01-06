@@ -14,3 +14,5 @@ coverage/
 *.tsbuildinfo
 ninja-battle-nakama-main/
 docs/
+# local notes
+t.txt
