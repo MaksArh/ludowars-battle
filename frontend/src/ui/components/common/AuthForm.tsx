@@ -36,6 +36,12 @@ export function AuthForm({ title, fields, submitText, onSubmit, error, isLoading
 
   return (
     <Box component="form" onSubmit={handleSubmit} maxWidth={360} mx="auto">
+      <Box
+        component="img"
+        src="/assets/logo.png"
+        alt="Ludowars Battle"
+        sx={{ width: '100%', maxWidth: 280, height: 'auto', mx: 'auto', mb: 2, display: 'block' }}
+      />
       <Typography variant="h4" fontWeight={600} mb={3} textAlign="center">
         {title}
       </Typography>

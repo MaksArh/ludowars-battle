@@ -7,6 +7,7 @@ import { EffectsSystem } from '../systems/EffectsSystem';
 import { audioManager } from '../systems/AudioManager';
 import { networkManager } from '@/services/NetworkManager';
 import { GAME, COMBAT } from '../config/GameConstants';
+import { MAPS, getMapById } from '../maps';
 import { eventBus, EVENTS } from '../utils/EventBus';
 import type {
   RemotePosition,
@@ -24,14 +25,6 @@ import type {
   RouletteResult,
 } from '@/types/network';
 
-// точки спавна
-const SPAWN_POINTS = [
-  { x: 200, y: 550 },
-  { x: 1080, y: 550 },
-  { x: 400, y: 350 },
-  { x: 880, y: 350 },
-];
-
 interface PendingSpawn {
   id: string;
   username: string;
@@ -46,6 +39,12 @@ export class GameScene extends Phaser.Scene {
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private combat!: CombatSystem;
   private effects!: EffectsSystem;
+
+  private currentMapId: string | null = null;
+  private mapSpawns: { x: number; y: number }[] = [];
+  private fallKillY = GAME.HEIGHT + 200;
+  private localFalling = false;
+  private pendingMapId: string | null = null;
 
   private frozen = true;
   private countdownText: Phaser.GameObjects.Text | null = null;
@@ -62,12 +61,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.add.image(GAME.WIDTH / 2, GAME.HEIGHT / 2, 'battle_bg')
+      .setDisplaySize(GAME.WIDTH, GAME.HEIGHT)
+      .setDepth(-100);
     this.platforms = this.physics.add.staticGroup();
-    this.createMap();
 
     this.combat = new CombatSystem(this);
     this.effects = new EffectsSystem(this);
     this.inputSys = new InputSystem(this);
+    this.combat.setupCollisions(this.platforms);
     audioManager.init(this);
 
     this.setupEvents();
@@ -79,11 +81,17 @@ export class GameScene extends Phaser.Scene {
       this.fpsText = this.add.text(10, 10, '', { fontSize: '14px', color: '#0f0' }).setDepth(1000);
     }
 
+    if (this.pendingMapId) {
+      this.applyMap(this.pendingMapId);
+    }
+
     if (matchId) {
       console.log('[GameScene] Scene ready, attaching to NetworkManager');
       networkManager.attach();
     } else {
       this.frozen = false;
+      const randomMap = MAPS[Math.floor(Math.random() * MAPS.length)];
+      this.applyMap(randomMap.id);
       this.spawnLocal('local', 'Player', 0);
     }
 
@@ -124,6 +132,7 @@ export class GameScene extends Phaser.Scene {
 
     const input = this.inputSys.get();
     this.localPlayer.updateLocal(delta, input);
+    this.checkFallDeath();
 
     // рывок
     if (input.dashLeft || input.dashRight) {
@@ -202,10 +211,9 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // рулетка
+    // рулетка (cooldown устанавливается после ответа сервера в ROULETTE_SYNC)
     if (input.ability && this.localPlayer.canUseRoulette() && this.isOnlineMatch) {
       networkManager.sendRoulette();
-      this.localPlayer.startRouletteCooldown();
     }
 
     if (this.isOnlineMatch) {
@@ -221,6 +229,9 @@ export class GameScene extends Phaser.Scene {
   private setupEvents() {
     this.listen(EVENTS.GAME_STATE, (msg: unknown) => {
       const m = msg as PlayersListMessage;
+      if (m.mapId) {
+        this.applyMap(m.mapId);
+      }
       const localId = networkManager.getLocalId();
       console.log('[GameScene] GAME_STATE localId:', localId, 'players:', m.players.map(p => p.id));
       for (const p of m.players) {
@@ -252,7 +263,15 @@ export class GameScene extends Phaser.Scene {
       const m = msg as RemotePosition;
       const fighter = this.fighters.get(m.playerId);
       if (fighter) {
-        fighter.setTargetPosition(m.data.x, m.data.y, m.data.facing, m.data.hp, m.data.invuln);
+        fighter.setTargetPosition(
+          m.data.x,
+          m.data.y,
+          m.data.facing,
+          m.data.hp,
+          m.data.invuln,
+          m.data.vx,
+          m.data.vy
+        );
       }
     });
 
@@ -285,17 +304,19 @@ export class GameScene extends Phaser.Scene {
 
     this.listen(EVENTS.REMOTE_KILL, (msg: unknown) => {
       const event = msg as KillEvent;
-      const spawn = SPAWN_POINTS[0];
       audioManager.playSFX('die');
       if (event.victimId === networkManager.getLocalId() && this.localPlayer?.body) {
         this.time.delayedCall(COMBAT.RESPAWN_TIME, () => {
-          this.localPlayer?.respawn(spawn.x, spawn.y);
+          const nextSpawn = this.getRandomSpawn();
+          this.localPlayer?.respawn(nextSpawn.x, nextSpawn.y);
+          this.localFalling = false;
         });
       } else {
         const fighter = this.fighters.get(event.victimId);
         if (fighter) {
           this.time.delayedCall(COMBAT.RESPAWN_TIME, () => {
-            fighter.respawn(spawn.x, spawn.y);
+            const nextSpawn = this.getRandomSpawn();
+            fighter.respawn(nextSpawn.x, nextSpawn.y);
           });
         }
       }
@@ -306,6 +327,9 @@ export class GameScene extends Phaser.Scene {
       if (!this.sys?.displayList) {
         this.time.delayedCall(50, () => eventBus.emit(EVENTS.MATCH_START, m));
         return;
+      }
+      if (m.mapId) {
+        this.applyMap(m.mapId);
       }
       this.frozen = true;
       this.createCountdownText();
@@ -366,10 +390,34 @@ export class GameScene extends Phaser.Scene {
 
     this.listen(EVENTS.ROULETTE_SYNC, (msg: unknown) => {
       const result = msg as RouletteResult;
-      const fighter = this.fighters.get(result.playerId);
-      if (fighter) {
-        fighter.applyRouletteEffect(result.effect, result.duration);
-        this.effects.showRouletteResult(fighter.x, fighter.y, result.symbols, result.effect);
+      if (!this.sys?.displayList) return;
+      const isLocal = result.playerId === networkManager.getLocalId();
+      const isError = result.effect.startsWith('error_');
+
+      // обработка ошибок (только для локального игрока)
+      if (isError) {
+        if (isLocal) {
+          console.log('[GameScene] Roulette error:', result.effect);
+          // TODO: показать уведомление об ошибке
+        }
+        return;
+      }
+
+      const fighter = this.fighters.get(result.playerId)
+        || (isLocal ? this.localPlayer : null);
+
+      if (!fighter) {
+        console.warn('[GameScene] ROULETTE_SYNC: fighter not found:', result.playerId,
+          'available:', Array.from(this.fighters.keys()));
+        return;
+      }
+
+      fighter.applyRouletteEffect(result.effect, result.duration);
+      this.effects.showRouletteResult(fighter.x, fighter.y, result.symbols, result.effect);
+
+      // cooldown только для локального игрока после успешного ответа
+      if (isLocal && this.localPlayer) {
+        this.localPlayer.startRouletteCooldown();
       }
     });
 
@@ -433,7 +481,7 @@ export class GameScene extends Phaser.Scene {
         const dx = Math.abs(proj.x - fighter.x);
         const dy = Math.abs(proj.y - fighter.y);
 
-        if (dx < 30 && dy < 40) {
+        if (dx < 45 && dy < 60) {
           const killed = fighter.takeDamage(proj.damage);
           this.effects.damageNumber(proj.x, proj.y, proj.damage);
           this.effects.hitMarker(proj.x, proj.y);
@@ -503,12 +551,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const spawn = SPAWN_POINTS[spawnIndex % SPAWN_POINTS.length];
+    const spawn = this.getSpawnByIndex(spawnIndex);
     console.log('[GameScene] Spawning local player at', spawn.x, spawn.y, 'index:', spawnIndex);
-    const fighter = new Fighter(this, spawn.x, spawn.y, id, username, true);
+    const fighter = new Fighter(this, spawn.x, spawn.y, id, username, true, spawnIndex);
     this.physics.add.collider(fighter, this.platforms);
+    this.combat.setupCollisions(this.platforms, fighter);
     this.fighters.set(id, fighter);
     this.localPlayer = fighter;
+    this.localFalling = false;
 
     const weaponIds = this.registry.get('playerWeapons') as string[] | undefined;
     if (weaponIds && weaponIds.length > 0) {
@@ -521,9 +571,9 @@ export class GameScene extends Phaser.Scene {
       console.log('[GameScene] Remote player already exists:', id);
       return;
     }
-    const spawn = SPAWN_POINTS[spawnIndex % SPAWN_POINTS.length];
+    const spawn = this.getSpawnByIndex(spawnIndex);
     console.log('[GameScene] Spawning remote player:', username, 'at', spawn.x, spawn.y);
-    const fighter = new Fighter(this, spawn.x, spawn.y, id, username, false);
+    const fighter = new Fighter(this, spawn.x, spawn.y, id, username, false, spawnIndex);
     this.fighters.set(id, fighter);
   }
 
@@ -549,22 +599,71 @@ export class GameScene extends Phaser.Scene {
     audioManager.playSFX(key);
   }
 
-  private createMap() {
-    const ground = 650;
-    for (let i = 0; i < GAME.WIDTH / 32; i++) {
-      this.platforms.create(i * 32 + 16, ground, 'platform');
+  private applyMap(mapId: string) {
+    if (!mapId) return;
+    if (!this.physics || !this.physics.add) {
+      this.pendingMapId = mapId;
+      return;
     }
-    this.row(100, 520, 6);
-    this.row(500, 400, 8);
-    this.row(1000, 520, 6);
-    this.row(250, 280, 5);
-    this.row(750, 280, 5);
-    this.row(550, 150, 4);
+    if (this.currentMapId === mapId) return;
+    const map = getMapById(mapId);
+    this.currentMapId = map.id;
+    this.pendingMapId = null;
+
+    const scaleX = GAME.WIDTH / map.size.width;
+    const scaleY = GAME.HEIGHT / map.size.height;
+
+    if (this.platforms) {
+      try {
+        const children = this.platforms.getChildren();
+        for (const child of children) {
+          child.destroy();
+        }
+      } catch {
+        // ignore teardown issues in Phaser internals
+      }
+    }
+    this.platforms = this.physics.add.staticGroup();
+    for (const p of map.platforms) {
+      const w = p.w * scaleX;
+      const h = p.h * scaleY;
+      const x = p.x * scaleX + w / 2;
+      const y = p.y * scaleY + h / 2;
+      const key = h >= 30 ? 'tile_ground' : 'tile_platform';
+      const platform = this.platforms.create(x, y, key);
+      platform.setDisplaySize(w, h);
+      platform.refreshBody();
+    }
+
+    if (this.localPlayer) {
+      this.physics.add.collider(this.localPlayer, this.platforms);
+    }
+    this.combat.setupCollisions(this.platforms, this.localPlayer || undefined);
+
+    this.mapSpawns = map.spawns.map((s) => ({
+      x: s.x * scaleX,
+      y: s.y * scaleY,
+    }));
+    this.fallKillY = GAME.HEIGHT + 200;
+    this.physics.world.setBounds(0, 0, GAME.WIDTH, GAME.HEIGHT + 800);
   }
 
-  private row(x: number, y: number, n: number) {
-    for (let i = 0; i < n; i++) {
-      this.platforms.create(x + i * 32 + 16, y, 'platform');
+  private getSpawnByIndex(idx: number) {
+    const list = this.mapSpawns.length ? this.mapSpawns : [{ x: 200, y: 600 }];
+    return list[idx % list.length];
+  }
+
+  private getRandomSpawn() {
+    const list = this.mapSpawns.length ? this.mapSpawns : [{ x: 200, y: 600 }];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  private checkFallDeath() {
+    if (!this.localPlayer || !this.isOnlineMatch || this.localFalling) return;
+    if (this.localPlayer.y > this.fallKillY) {
+      this.localFalling = true;
+      this.localPlayer.die();
+      networkManager.sendFallDeath();
     }
   }
 }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLAYER, COMBAT } from '../config/GameConstants';
+import { SKINS, SkinId } from '../config/skins';
 import { WEAPONS } from '../config/WeaponConfigs';
 import { Weapon } from './Weapon';
 import { eventBus, EVENTS } from '../utils/EventBus';
@@ -8,6 +9,8 @@ import type { ProjectileData } from '@/types/combat';
 
 // скорость интерполяции для удаленных игроков
 const INTERPOLATION_SPEED = 0.5;
+const PLAYER_SPRITE_SCALE = PLAYER.HEIGHT / 256;
+const WEAPON_BOB_OFFSET = 2;
 
 // Fighter это и локальный и удаленный игрок
 // isLocal=true физика работает полностью
@@ -17,6 +20,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
   public readonly username: string;
   public readonly isLocal: boolean;
   public facingRight = true;
+  public readonly skin: SkinId;
 
   private jumps = PLAYER.MAX_JUMPS;
   private coyote = 0;
@@ -41,6 +45,8 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
 
   private targetX = 0;
   private targetY = 0;
+  private remoteVx = 0;
+  private remoteVy = 0;
 
   private nameText?: Phaser.GameObjects.Text;
   private hpBarBg?: Phaser.GameObjects.Rectangle;
@@ -49,6 +55,9 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
 
   private shieldGraphic?: Phaser.GameObjects.Arc;
   private damageAura?: Phaser.GameObjects.Arc;
+  private weaponSprite?: Phaser.GameObjects.Image;
+  private weaponBobTween?: Phaser.Tweens.Tween;
+  private weaponBobOffset = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -56,12 +65,14 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     y: number,
     id: string,
     username: string,
-    isLocal: boolean
+    isLocal: boolean,
+    skinIndex: number
   ) {
-    super(scene, x, y, 'player');
+    super(scene, x, y, 'player_atlas');
     this.id = id;
     this.username = username;
     this.isLocal = isLocal;
+    this.skin = SKINS[skinIndex % SKINS.length];
     this.targetX = x;
     this.targetY = y;
 
@@ -78,7 +89,6 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     } else {
       body.setAllowGravity(false);
       body.setImmovable(true);
-      this.setTint(0xf44336);
 
       this.nameText = scene.add
         .text(x, y - PLAYER.HEIGHT / 2 - 20, username, {
@@ -96,6 +106,9 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.weapons.push(new Weapon(scene, WEAPONS.pistol, this));
+    this.setScale(PLAYER_SPRITE_SCALE);
+    this.play(`player_${this.skin}_idle`);
+    this.createWeaponSprite();
 
     if (isLocal) {
       this.scene.time.delayedCall(0, () => {
@@ -157,6 +170,9 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
       this.coyote = 0;
       this.lastJumpType = isDouble ? 'double' : 'normal';
     }
+
+    this.updateAnimation(grounded, body.velocity.x, body.velocity.y);
+    this.updateWeaponSpritePosition();
   }
 
   getLastJumpType(): 'normal' | 'double' | null {
@@ -175,9 +191,19 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     body.setAccelerationX(0);
   }
 
-  setTargetPosition(x: number, y: number, facing: boolean, hp: number, invuln?: boolean) {
+  setTargetPosition(
+    x: number,
+    y: number,
+    facing: boolean,
+    hp: number,
+    invuln?: boolean,
+    vx = 0,
+    vy = 0
+  ) {
     this.targetX = x;
     this.targetY = y;
+    this.remoteVx = vx;
+    this.remoteVy = vy;
     this.facingRight = facing;
     this.setFlipX(!facing);
     this.hp = hp;
@@ -201,6 +227,9 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.updateRemoteUI();
+    const grounded = Math.abs(this.remoteVy) < 5;
+    this.updateAnimation(grounded, this.remoteVx, this.remoteVy);
+    this.updateWeaponSpritePosition();
   }
 
   private updateRemoteUI() {
@@ -225,6 +254,10 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     const weapon = this.weapons[this.weaponIdx];
     if (!weapon) return [];
     const projectiles = weapon.fire(this.facingRight);
+
+    if (projectiles.length > 0) {
+      this.playWeaponFireAnim();
+    }
 
     if (this.damageMultiplier !== 1.0) {
       for (const p of projectiles) {
@@ -259,10 +292,70 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  private updateAnimation(grounded: boolean, vx: number, vy: number) {
+    if (!this.active) return;
+    const absVx = Math.abs(vx);
+    const absVy = Math.abs(vy);
+    let state: 'run' | 'jump' | 'idle' = 'idle';
+
+    if (!grounded && absVy > 5) {
+      state = 'jump';
+    } else if (absVx > 10) {
+      state = 'run';
+    }
+
+    const key = `player_${this.skin}_${state}`;
+    if (this.anims?.currentAnim?.key !== key) {
+      this.anims.play(key, true);
+    }
+  }
+
+  private createWeaponSprite() {
+    const key = this.getWeaponTextureKey(this.getWeapon()?.getConfig().id);
+    this.weaponSprite = this.scene.add.image(this.x, this.y, key);
+    this.weaponSprite.setOrigin(0.2, 0.5);
+    this.weaponSprite.setScale(PLAYER_SPRITE_SCALE);
+    this.weaponSprite.setDepth(this.depth + 1);
+  }
+
+  private updateWeaponSpritePosition() {
+    if (!this.weaponSprite || !this.active) return;
+    const offsetX = this.facingRight ? PLAYER.WIDTH * 0.45 : -PLAYER.WIDTH * 0.45;
+    const offsetY = PLAYER.HEIGHT * 0.3 + this.weaponBobOffset;
+    this.weaponSprite.setPosition(this.x + offsetX, this.y + offsetY);
+    this.weaponSprite.setFlipX(!this.facingRight);
+  }
+
+  private playWeaponFireAnim() {
+    if (!this.weaponSprite) return;
+    this.weaponBobTween?.stop();
+    this.weaponBobOffset = -WEAPON_BOB_OFFSET;
+    this.weaponBobTween = this.scene.tweens.add({
+      targets: this,
+      weaponBobOffset: 0,
+      duration: 120,
+      ease: 'Quad.Out',
+    });
+  }
+
+  private getWeaponTextureKey(weaponId?: string): string {
+    if (!weaponId) return 'weapon_pistol';
+    if (weaponId === 'shotgun') return 'weapon_shotgun';
+    if (weaponId === 'assault_rifle' || weaponId === 'assault') return 'weapon_assault';
+    return 'weapon_pistol';
+  }
+
+  private updateWeaponSpriteTexture() {
+    if (!this.weaponSprite || !this.weaponSprite.scene) return;
+    const key = this.getWeaponTextureKey(this.getWeapon()?.getConfig().id);
+    this.weaponSprite.setTexture(key);
+  }
+
   switchWeapon() {
     if (this.weapons.length <= 1) return;
     this.weapons[this.weaponIdx]?.cancelReload();
     this.weaponIdx = (this.weaponIdx + 1) % this.weapons.length;
+    this.updateWeaponSpriteTexture();
     if (this.isLocal) {
       const weapon = this.weapons[this.weaponIdx];
       eventBus.emit(EVENTS.WEAPON_CHANGED, { weaponId: weapon?.getConfig().id || 'pistol' });
@@ -296,6 +389,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
       this.addWeapon(id);
       this.weaponIdx = this.weapons.length - 1;
     }
+    this.updateWeaponSpriteTexture();
   }
 
   loadWeapons(weaponIds: string[]) {
@@ -312,6 +406,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     if (this.weapons.length === 0) {
       this.weapons.push(new Weapon(this.scene, WEAPONS.pistol, this));
     }
+    this.updateWeaponSpriteTexture();
 
     if (this.isLocal) {
       const weapon = this.getWeapon();
@@ -354,10 +449,12 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
   }
 
   die() {
-    this.setVisible(false);
+    this.setAngle(90);
+    this.setVisible(true);
     this.setActive(false);
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) body.enable = false;
+    this.weaponSprite?.setVisible(false);
 
     if (this.isLocal) {
       eventBus.emit(EVENTS.PLAYER_DIED, { playerId: this.id });
@@ -369,11 +466,14 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.setPosition(x, y);
     this.targetX = x;
     this.targetY = y;
+    this.setAngle(0);
     this.setVisible(true);
     this.setActive(true);
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) body.enable = true;
     this.jumps = PLAYER.MAX_JUMPS;
+    this.weaponSprite?.setVisible(true);
+    this.play(`player_${this.skin}_idle`);
 
     if (this.isLocal) {
       this.invuln = true;
@@ -458,6 +558,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
   }
 
   private createShieldVisual() {
+    if (!this.scene || !this.scene.sys?.displayList || !this.scene.add || !this.active) return;
     if (this.shieldGraphic) this.shieldGraphic.destroy();
     this.shieldGraphic = this.scene.add.circle(this.x, this.y, 35, 0x4488ff, 0.3);
     this.shieldGraphic.setStrokeStyle(2, 0x88ccff);
@@ -465,6 +566,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
   }
 
   private createDamageAura() {
+    if (!this.scene || !this.scene.sys?.displayList || !this.scene.add || !this.active) return;
     if (this.damageAura) this.damageAura.destroy();
     this.damageAura = this.scene.add.circle(this.x, this.y, 30, 0xff4444, 0.2);
     this.damageAura.setDepth(this.depth - 1);
@@ -537,6 +639,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.hpBarBg?.destroy();
     this.hpBarFill?.destroy();
     this.clearRouletteVisuals();
+    this.weaponSprite?.destroy();
     super.destroy(fromScene);
   }
 }

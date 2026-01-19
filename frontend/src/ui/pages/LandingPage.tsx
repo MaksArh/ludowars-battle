@@ -6,6 +6,7 @@ import { useUserStore } from '@/store';
 export function LandingPage() {
   const navigate = useNavigate();
   const { loginAsGuest, isLoading, error, isAuth } = useUserStore();
+  const logoUrl = `${import.meta.env.BASE_URL}assets/logo.png`;
 
   const handleGuest = async () => {
     await loginAsGuest();
@@ -19,11 +20,17 @@ export function LandingPage() {
 
   return (
     <Box textAlign="center">
+      <Box
+        component="img"
+        src={logoUrl}
+        alt="Ludowars Battle"
+        sx={{ width: '100%', maxWidth: 360, height: 'auto', mx: 'auto', mb: 2, display: 'block' }}
+      />
       <Typography variant="h3" fontWeight={700} gutterBottom>
         Ludowars Battle
       </Typography>
       <Typography color="text.secondary" mb={4}>
-        2D Multiplayer Platformer Shooter
+        powered by poor trio from ITMO University
       </Typography>
       {error && <Alert severity="error" sx={{ mb: 2, maxWidth: 300, mx: 'auto' }}>{error}</Alert>}
       <Stack spacing={2} maxWidth={300} mx="auto">

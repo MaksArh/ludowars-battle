@@ -22,6 +22,7 @@ type MatchState struct {
 	CountdownActive bool                   `json:"-"`
 	Open            bool                   `json:"-"`
 	SpawnIndex      int                    `json:"-"`
+	MapId           string                 `json:"-"`
 	LastTimeSync    int64                  `json:"-"`
 	LastCountdown   int                    `json:"-"`
 	CountdownEnded  bool                   `json:"-"`
@@ -48,6 +49,23 @@ type KillMessage struct {
 	WeaponId string `json:"weaponId"`
 }
 
+type FallMessage struct {
+	PlayerId string `json:"playerId"`
+}
+
+var mapIds = []string{
+	"arena",
+	"pit",
+	"bridge",
+	"steps",
+	"towers",
+	"cross",
+	"gaps",
+	"columns",
+	"valley",
+	"islands",
+}
+
 // символы рулетки: 0=урон 1=хил 2=щит 3=череп
 const (
 	SymDamage = 0
@@ -64,11 +82,14 @@ type RouletteResult struct {
 }
 
 func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+	rand.Seed(time.Now().UnixNano())
+	mapId := mapIds[rand.Intn(len(mapIds))]
 	state := &MatchState{
 		Players:       make(map[string]*PlayerInfo),
 		ReadyPlayers:  make(map[string]bool),
 		Open:          true,
 		LastCountdown: -1,
+		MapId:         mapId,
 	}
 	label := `{"open":true}`
 	return state, TickRate, label
@@ -118,8 +139,30 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.DB
 	}
 	playersMsg, _ := json.Marshal(map[string]interface{}{
 		"players": playersList,
+		"mapId":   s.MapId,
 	})
 	dispatcher.BroadcastMessage(OpGameState, playersMsg, presences, nil, true)
+
+	// если матч уже идет, отправляем новичкам текущее состояние
+	if s.CountdownEnded {
+		logger.Info("Match already started, sending state to late joiners")
+
+		startMsg, _ := json.Marshal(map[string]interface{}{
+			"duration":     MatchDuration,
+			"killsToWin":   KillsToWin,
+			"freezeTime":   FreezeTime,
+			"startTimeUtc": s.StartTime.UnixMilli(),
+			"mapId":        s.MapId,
+		})
+		dispatcher.BroadcastMessage(OpMatchStart, startMsg, presences, nil, true)
+
+		// сразу размораживаем - матч уже идет
+		freezeMsg, _ := json.Marshal(map[string]interface{}{
+			"countdown": 0,
+			"frozen":    false,
+		})
+		dispatcher.BroadcastMessage(OpFreeze, freezeMsg, presences, nil, true)
+	}
 
 	// если набралось достаточно игроков ждем готовности
 	if len(s.Players) >= MinPlayers && !s.Started {
@@ -183,6 +226,7 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 			"killsToWin":   KillsToWin,
 			"freezeTime":   FreezeTime,
 			"startTimeUtc": s.StartTime.UnixMilli(),
+				"mapId":        s.MapId,
 		})
 		dispatcher.BroadcastMessage(OpMatchStart, startMsg, nil, nil, true)
 	}
@@ -261,6 +305,15 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 
 			now := time.Now().UnixMilli()
 			if now-player.LastRoulette < RouletteCooldown {
+				// отправляем ошибку cooldown (клиент отфильтрует по playerId)
+				errResult := RouletteResult{
+					PlayerId: playerId,
+					Symbols:  [3]int{0, 0, 0},
+					Effect:   "error_cooldown",
+					Duration: 0,
+				}
+				errMsg, _ := json.Marshal(errResult)
+				dispatcher.BroadcastMessage(OpRouletteSync, errMsg, nil, nil, true)
 				continue
 			}
 
@@ -268,6 +321,15 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 			_, _, err := nk.WalletUpdate(ctx, playerId, map[string]int64{"coins": -RouletteCost}, nil, false)
 			if err != nil {
 				logger.Warn("Roulette failed for %s: %v", playerId, err)
+				// отправляем ошибку недостаточно монет
+				errResult := RouletteResult{
+					PlayerId: playerId,
+					Symbols:  [3]int{0, 0, 0},
+					Effect:   "error_no_coins",
+					Duration: 0,
+				}
+				errMsg, _ := json.Marshal(errResult)
+				dispatcher.BroadcastMessage(OpRouletteSync, errMsg, nil, nil, true)
 				continue
 			}
 
@@ -325,6 +387,43 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 				finalizeMatch(ctx, logger, nk, dispatcher, s, "kills_reached")
 				return nil
 			}
+
+		case OpFallDeath:
+			playerId := msg.GetUserId()
+			if playerId == "" {
+				var fall FallMessage
+				_ = json.Unmarshal(msg.GetData(), &fall)
+				playerId = fall.PlayerId
+			}
+			if playerId == "" {
+				continue
+			}
+			if victim, ok := s.Players[playerId]; ok {
+				victim.Deaths++
+				victim.Score -= 2
+				if victim.Score < 0 {
+					victim.Score = 0
+				}
+			}
+
+			scoreboard := make([]map[string]interface{}, 0, len(s.Players))
+			for _, p := range s.Players {
+				scoreboard = append(scoreboard, map[string]interface{}{
+					"id":       p.ID,
+					"username": p.Username,
+					"kills":    p.Kills,
+					"deaths":   p.Deaths,
+					"score":    p.Score,
+				})
+			}
+
+			scoreMsg, _ := json.Marshal(map[string]interface{}{
+				"killerId":   "",
+				"victimId":   playerId,
+				"weaponId":   "fall",
+				"scoreboard": scoreboard,
+			})
+			dispatcher.BroadcastMessage(OpScoreboard, scoreMsg, nil, nil, true)
 
 		default:
 			dispatcher.BroadcastMessage(op, msg.GetData(), nil, msg, true)

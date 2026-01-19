@@ -13,6 +13,12 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     watch: { usePolling: true },
+    // разрешаем внешние dev-хосты для туннелей (ngrok/trycloudflare)
+    allowedHosts: [
+      '.ngrok-free.app',
+      '.ngrok-free.dev',
+      '.trycloudflare.com',
+    ],
   },
   build: {
     outDir: 'dist',

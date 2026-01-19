@@ -62,7 +62,7 @@ export class InputSystem {
       s: kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
     };
 
-    kb.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE]);
+    kb.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE, Phaser.Input.Keyboard.KeyCodes.S]);
   }
 
   get(): InputState {

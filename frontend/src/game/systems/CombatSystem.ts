@@ -3,7 +3,7 @@ import { Projectile } from '../entities/Projectile';
 import { COMBAT } from '../config/GameConstants';
 import { WEAPONS } from '../config/WeaponConfigs';
 import type { ProjectileData } from '@/types/combat';
-import type { Player } from '../entities/Player';
+import type { Fighter } from '../entities/Fighter';
 
 const POOL_SIZE = 200;
 
@@ -11,6 +11,8 @@ export class CombatSystem {
   private scene: Phaser.Scene;
   private projectiles: Phaser.Physics.Arcade.Group;
   private pickups: Phaser.Physics.Arcade.StaticGroup;
+  private projectileColliderTarget: Phaser.Physics.Arcade.StaticGroup | null = null;
+  private pickupOverlapSet = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -42,19 +44,25 @@ export class CombatSystem {
     return proj;
   }
 
-  setupCollisions(player: Player, platforms: Phaser.Physics.Arcade.StaticGroup) {
-    this.scene.physics.add.collider(this.projectiles, platforms, (p) => {
-      (p as Projectile).deactivate();
-    });
-
-    this.scene.physics.add.overlap(player, this.pickups, (_, pickup) => {
-      const hp = (pickup as Phaser.GameObjects.GameObject).getData('heal') as number;
-      player.heal(hp);
-      (pickup as Phaser.Physics.Arcade.Sprite).destroy();
-      this.scene.time.delayedCall(COMBAT.PICKUP_RESPAWN, () => {
-        this.spawnPickup((pickup as Phaser.Physics.Arcade.Sprite).x, (pickup as Phaser.Physics.Arcade.Sprite).y);
+  setupCollisions(platforms: Phaser.Physics.Arcade.StaticGroup, player?: Fighter) {
+    if (this.projectileColliderTarget !== platforms) {
+      this.scene.physics.add.collider(this.projectiles, platforms, (p) => {
+        (p as Projectile).deactivate();
       });
-    });
+      this.projectileColliderTarget = platforms;
+    }
+
+    if (player && !this.pickupOverlapSet) {
+      this.scene.physics.add.overlap(player, this.pickups, (_, pickup) => {
+        const hp = (pickup as Phaser.GameObjects.GameObject).getData('heal') as number;
+        player.heal(hp);
+        (pickup as Phaser.Physics.Arcade.Sprite).destroy();
+        this.scene.time.delayedCall(COMBAT.PICKUP_RESPAWN, () => {
+          this.spawnPickup((pickup as Phaser.Physics.Arcade.Sprite).x, (pickup as Phaser.Physics.Arcade.Sprite).y);
+        });
+      });
+      this.pickupOverlapSet = true;
+    }
   }
 
   spawnPickup(x: number, y: number, heal = COMBAT.HEALTH_PACK) {

@@ -6,6 +6,7 @@ interface PlayerScore {
   kills: number;
   deaths: number;
   score: number;
+  spawnIndex?: number;
 }
 
 interface GameState {
@@ -32,7 +33,7 @@ interface GameStore extends GameState {
   addKill: () => void;
   addDeath: () => void;
   setTime: (t: number) => void;
-  addPlayer: (id: string, username: string) => void;
+  addPlayer: (id: string, username: string, spawnIndex?: number) => void;
   removePlayer: (id: string) => void;
   setPlayers: (players: PlayerScore[]) => void;
   updatePlayerScore: (killerId: string, victimId: string) => void;
@@ -66,14 +67,22 @@ export const useGameStore = create<GameStore>((set) => ({
   addKill: () => set((s) => ({ kills: s.kills + 1, score: s.score + 10 })),
   addDeath: () => set((s) => ({ deaths: s.deaths + 1, score: Math.max(0, s.score - 2) })),
   setTime: (timeLeft) => set({ timeLeft }),
-  addPlayer: (id, username) =>
+  addPlayer: (id, username, spawnIndex) =>
     set((s) => {
       if (s.players.find((p) => p.id === id)) return s;
-      return { players: [...s.players, { id, username, kills: 0, deaths: 0, score: 0 }] };
+      return { players: [...s.players, { id, username, kills: 0, deaths: 0, score: 0, spawnIndex }] };
     }),
   removePlayer: (id) =>
     set((s) => ({ players: s.players.filter((p) => p.id !== id) })),
-  setPlayers: (players) => set({ players }),
+  setPlayers: (players) =>
+    set((s) => {
+      const spawnMap = new Map(s.players.map((p) => [p.id, p.spawnIndex]));
+      const merged = players.map((p) => ({
+        ...p,
+        spawnIndex: spawnMap.get(p.id),
+      }));
+      return { players: merged };
+    }),
   updatePlayerScore: (killerId, victimId) =>
     set((s) => ({
       players: s.players.map((p) => {

@@ -26,8 +26,9 @@ export function createGame(parent: string, matchId?: string, playerWeapons?: str
       },
     },
     render: {
-      antialias: false, // Slightly faster rendering
-      pixelArt: true,   // No smoothing needed for pixel graphics
+      antialias: false,
+      pixelArt: true,
+      roundPixels: true,
     },
     scene: [BootScene, GameScene],
   });

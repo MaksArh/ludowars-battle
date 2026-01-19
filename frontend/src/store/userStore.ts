@@ -12,6 +12,23 @@ function parseWallet(walletStr?: string): { coins: number } {
   }
 }
 
+function parseError(e: unknown): string {
+  if (!e) return 'Unknown error';
+  if (typeof e === 'string') return e;
+  if (e instanceof Error) {
+    // Nakama SDK может возвращать ошибку с message или statusText
+    const err = e as Error & { statusText?: string; status?: number };
+    if (err.message) return err.message;
+    if (err.statusText) return err.statusText;
+    return `Error ${err.status || ''}`;
+  }
+  // Объект с message
+  if (typeof e === 'object' && 'message' in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return String(e);
+}
+
 interface UserState {
   user: User | null;
   isAuth: boolean;
@@ -32,6 +49,10 @@ export const useUserStore = create<UserState>((set) => ({
   error: null,
 
   login: async ({ email, password }) => {
+    if (password.length < 8) {
+      set({ error: 'Password must be at least 8 characters', isLoading: false });
+      return;
+    }
     set({ isLoading: true, error: null });
     try {
       await nakama.authenticateEmail(email, password);
@@ -43,23 +64,33 @@ export const useUserStore = create<UserState>((set) => ({
         isLoading: false,
       });
     } catch (e) {
-      set({ error: (e as Error).message, isLoading: false });
+      console.error('[Auth] Login error:', e);
+      set({ error: parseError(e), isLoading: false });
     }
   },
 
   register: async ({ email, password, username }) => {
+    if (password.length < 8) {
+      set({ error: 'Password must be at least 8 characters', isLoading: false });
+      return;
+    }
+    if (!username || username.length < 2) {
+      set({ error: 'Username must be at least 2 characters', isLoading: false });
+      return;
+    }
     set({ isLoading: true, error: null });
     try {
-      await nakama.authenticateEmail(email, password, true);
+      await nakama.authenticateEmail(email, password, true, username);
       const acc = await nakama.getAccount();
       const wallet = parseWallet(acc.wallet);
       set({
-        user: { id: nakama.session!.user_id!, username, coins: wallet.coins },
+        user: { id: nakama.session!.user_id!, username: acc.user?.username || username, coins: wallet.coins },
         isAuth: true,
         isLoading: false,
       });
     } catch (e) {
-      set({ error: (e as Error).message, isLoading: false });
+      console.error('[Auth] Register error:', e);
+      set({ error: parseError(e), isLoading: false });
     }
   },
 
@@ -75,7 +106,8 @@ export const useUserStore = create<UserState>((set) => ({
         isLoading: false,
       });
     } catch (e) {
-      set({ error: (e as Error).message, isLoading: false });
+      console.error('[Auth] Guest login error:', e);
+      set({ error: parseError(e), isLoading: false });
     }
   },
 

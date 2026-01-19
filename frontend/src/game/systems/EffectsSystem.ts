@@ -192,6 +192,7 @@ export class EffectsSystem {
   private readonly ROULETTE_SYMBOLS = ['⚔️', '❤️', '🛡️', '💀'];
 
   showRouletteResult(x: number, y: number, symbols: [number, number, number], effect: string) {
+    if (!this.scene || !this.scene.sys?.displayList || !this.scene.add || !this.scene.time) return;
     const slotY = y - 60;
     const slotWidth = 30;
     const startX = x - slotWidth;
@@ -209,7 +210,7 @@ export class EffectsSystem {
 
       let spinCount = 0;
       const maxSpins = 10 + i * 5;
-      const spinTimer = this.scene.time.addEvent({
+      this.scene.time.addEvent({
         delay: 50,
         repeat: maxSpins,
         callback: () => {
@@ -230,6 +231,7 @@ export class EffectsSystem {
     }
 
     this.scene.time.delayedCall(1500, () => {
+      if (!this.scene || !this.scene.sys?.displayList || !this.scene.add || !this.scene.time) return;
       const effectColor = this.getEffectColor(effect);
       const effectText = this.scene.add.text(x, slotY + 35, this.formatEffect(effect), {
         fontSize: '14px',
@@ -239,6 +241,7 @@ export class EffectsSystem {
       }).setOrigin(0.5).setDepth(101);
 
       this.scene.time.delayedCall(2000, () => {
+        if (!this.scene || !this.scene.sys?.displayList || !this.scene.add) return;
         this.scene.tweens.add({
           targets: [bg, effectText, ...symbolTexts],
           alpha: 0,

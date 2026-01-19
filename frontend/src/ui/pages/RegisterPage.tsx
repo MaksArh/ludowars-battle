@@ -4,9 +4,9 @@ import { useUserStore } from '@/store';
 import { AuthForm, FormField } from '@/ui/components';
 
 const FIELDS: FormField[] = [
-  { name: 'username', label: 'Username' },
+  { name: 'username', label: 'Username (min 2 chars)' },
   { name: 'email', label: 'Email', type: 'email' },
-  { name: 'password', label: 'Password', type: 'password' },
+  { name: 'password', label: 'Password (min 8 chars)', type: 'password' },
 ];
 
 export function RegisterPage() {

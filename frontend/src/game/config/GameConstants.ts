@@ -1,24 +1,24 @@
 export const GAME = {
-  WIDTH: 1280,
-  HEIGHT: 720,
+  WIDTH: 1920,
+  HEIGHT: 1080,
   BG_COLOR: 0x1a1a2e,
 } as const;
 
 export const PLAYER = {
-  WIDTH: 32,
-  HEIGHT: 48,
-  SPEED: 300,
-  ACCEL: 1500,
-  DRAG: 1200,
-  JUMP: -450,
-  DOUBLE_JUMP: -400,
+  WIDTH: 80,
+  HEIGHT: 128,
+  SPEED: 450,
+  ACCEL: 2250,
+  DRAG: 1800,
+  JUMP: -675,
+  DOUBLE_JUMP: -600,
   MAX_JUMPS: 2,
-  GRAVITY: 1200,
-  MAX_FALL: 800,
-  COYOTE: 100,
+  GRAVITY: 1650,
+  MAX_FALL: 1200,
+  COYOTE: 120,
   JUMP_BUFFER: 100,
   // Dash
-  DASH_SPEED: 600,
+  DASH_SPEED: 1500,
   DASH_DURATION: 150,
   DASH_COOLDOWN: 500,
 } as const;
@@ -43,8 +43,12 @@ export const COMBAT = {
 } as const;
 
 export const PROJECTILE = {
-  WIDTH: 8,
-  HEIGHT: 4,
+  WIDTH: 12,
+  HEIGHT: 6,
+} as const;
+
+export const TILE = {
+  SIZE: 54,
 } as const;
 
 

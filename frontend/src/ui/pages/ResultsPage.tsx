@@ -12,6 +12,7 @@ import { matchmaking } from '@/services/matchmakingService';
 import { refreshUserCoins } from '@/services/userService';
 import { ROUTES } from '@/config/constants';
 import { audioService } from '@/services/AudioService';
+import { WinnerPreviewCanvas } from '@/ui/components/WinnerPreviewCanvas';
 
 export function ResultsPage() {
   const navigate = useNavigate();
@@ -46,6 +47,14 @@ export function ResultsPage() {
     return sortedPlayers[0].id === localId || winner === localId;
   }, [sortedPlayers, localId, winner]);
 
+  const winnerId = winner || sortedPlayers[0]?.id || null;
+  const winnerPlayer = winnerId ? players.find((p) => p.id === winnerId) : null;
+  const winnerName =
+    (winnerId && matchResult?.stats?.[winnerId]?.username) ||
+    winnerPlayer?.username ||
+    'Winner';
+  const winnerSkinIndex = winnerPlayer?.spawnIndex ?? 0;
+
   const soundPlayed = useRef(false);
   useEffect(() => {
     if (soundPlayed.current) return;
@@ -79,6 +88,12 @@ export function ResultsPage() {
           <Typography variant="h2" color="text.secondary">DEFEAT</Typography>
         )}
       </Box>
+
+      {winnerId && (
+        <Box sx={{ mb: 3 }}>
+          <WinnerPreviewCanvas skinIndex={winnerSkinIndex} username={winnerName} />
+        </Box>
+      )}
 
       <Paper sx={{ p: 3, mb: 4, textAlign: 'center' }}>
         <Typography variant="h5" gutterBottom>{user?.username}</Typography>

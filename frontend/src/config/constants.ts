@@ -1,8 +1,30 @@
+const envSsl = import.meta.env.VITE_NAKAMA_USE_SSL;
+const runtimeHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+const ssl =
+  envSsl === 'true'
+    ? true
+    : envSsl === 'false'
+      ? false
+      : runtimeHttps;
+
+const runtimeHost = typeof window !== 'undefined' ? window.location.hostname : null;
+const envHost = import.meta.env.VITE_NAKAMA_HOST || 'localhost';
+
+// если env даёт localhost, а реальный хост не localhost (туннели/деплой), берём реальный
+const host =
+  envHost === 'localhost' && runtimeHost && runtimeHost !== 'localhost'
+    ? runtimeHost
+    : envHost;
+
+const port =
+  import.meta.env.VITE_NAKAMA_PORT ||
+  (ssl ? '443' : '7350');
+
 export const NAKAMA = {
-  host: import.meta.env.VITE_NAKAMA_HOST || 'localhost',
-  port: import.meta.env.VITE_NAKAMA_PORT || '7350',
+  host,
+  port,
   key: import.meta.env.VITE_NAKAMA_SERVER_KEY || 'ludowars_dev_key',
-  ssl: import.meta.env.VITE_NAKAMA_USE_SSL === 'true',
+  ssl,
 } as const;
 
 export const STORAGE = {

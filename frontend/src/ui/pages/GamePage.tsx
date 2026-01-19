@@ -42,18 +42,24 @@ export function GamePage() {
     const onHp = (e: { hp: number }) => setHp(e.hp);
     const onAmmo = (e: { ammo: number; max: number; reloading?: boolean }) => setAmmo(e.ammo, e.max, e.reloading);
     const onWeapon = (e: { weaponId: string }) => setWeapon(e.weaponId);
-    const onPlayerJoined = (e: { playerId: string; username: string }) => {
-      addPlayer(e.playerId, e.username);
+    const onPlayerJoined = (e: { playerId: string; username: string; spawnIndex?: number }) => {
+      addPlayer(e.playerId, e.username, e.spawnIndex);
     };
     const onPlayerLeft = (e: { playerId: string }) => {
       removePlayer(e.playerId);
     };
-    const onGameState = (e: { players: { id: string; username: string }[] }) => {
-      e.players.forEach((p) => addPlayer(p.id, p.username));
+    const onGameState = (e: { players: { id: string; username: string; spawnIndex?: number }[]; mapId?: string }) => {
+      if (e.mapId) {
+        useMatchStore.getState().setMapId(e.mapId);
+      }
+      e.players.forEach((p) => addPlayer(p.id, p.username, p.spawnIndex));
     };
-    const onMatchStart = (e: { startTimeUtc: number; duration: number; freezeTime: number }) => {
+    const onMatchStart = (e: { startTimeUtc: number; duration: number; freezeTime: number; mapId?: string }) => {
       matchConfigRef.current = e;
       setTime(Math.floor(e.duration / 1000));
+      if (e.mapId) {
+        useMatchStore.getState().setMapId(e.mapId);
+      }
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = window.setInterval(updateLocalTimer, 1000);
     };

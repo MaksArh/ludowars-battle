@@ -18,9 +18,14 @@ export enum OpCode {
   FREEZE = 16,
   SCOREBOARD = 17,
   PLAYER_READY = 18,
+  FALL_DEATH = 19,
 
   ROULETTE = 20,
   ROULETTE_SYNC = 21,
+}
+
+export interface FallDeathMessage {
+  playerId: string;
 }
 
 export interface PositionData {
@@ -77,6 +82,7 @@ export interface PlayerJoinedMessage {
 
 export interface PlayersListMessage {
   players: PlayerInfo[];
+  mapId?: string;
 }
 
 export interface MatchStartMessage {
@@ -84,6 +90,7 @@ export interface MatchStartMessage {
   killsToWin: number;
   freezeTime: number;
   startTimeUtc: number;
+  mapId?: string;
 }
 
 export interface PlayerMatchResult {

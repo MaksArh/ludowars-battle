@@ -103,6 +103,7 @@ export function SettingsPage() {
             control={<Switch checked={!muted} onChange={handleMuteToggle} />}
             label={muted ? 'Sound Muted' : 'Sound Enabled'}
           />
+
         </Stack>
       </Paper>
 

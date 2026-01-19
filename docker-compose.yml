@@ -52,15 +52,15 @@ services:
       context: ./frontend
       target: dev
     container_name: ludowars-frontend
+    environment:
+      VITE_NAKAMA_HOST: mandatory-effective-total-simplified.trycloudflare.com
+      VITE_NAKAMA_USE_SSL: true
+      VITE_NAKAMA_PORT: 443
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
       - "3000:3000"
-    environment:
-      - VITE_NAKAMA_HOST=localhost
-      - VITE_NAKAMA_PORT=7350
-      - VITE_NAKAMA_SERVER_KEY=ludowars_dev_key
     depends_on:
       - nakama
 

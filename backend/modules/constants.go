@@ -28,6 +28,7 @@ const (
 	OpFreeze      = 16
 	OpScoreboard  = 17
 	OpPlayerReady = 18
+	OpFallDeath   = 19
 
 	OpRoulette     = 20
 	OpRouletteSync = 21

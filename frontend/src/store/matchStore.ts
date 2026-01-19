@@ -23,6 +23,7 @@ interface MatchState {
   killsToWin: number;
   winner: string | null;
   matchResult: MatchResult | null;
+  mapId: string | null;
 }
 
 interface MatchStore extends MatchState {
@@ -33,6 +34,7 @@ interface MatchStore extends MatchState {
   removePlayer: (id: string) => void;
   setLocalId: (id: string) => void;
   setConfig: (duration: number, kills: number) => void;
+  setMapId: (mapId: string) => void;
   setWinner: (id: string) => void;
   setMatchResult: (r: MatchResult) => void;
   reset: () => void;
@@ -47,6 +49,7 @@ const init: MatchState = {
   killsToWin: 7,
   winner: null,
   matchResult: null,
+  mapId: null,
 };
 
 export const useMatchStore = create<MatchStore>((set) => ({
@@ -58,6 +61,7 @@ export const useMatchStore = create<MatchStore>((set) => ({
   removePlayer: (id) => set((s) => ({ players: s.players.filter((p) => p.id !== id) })),
   setLocalId: (localId) => set({ localId }),
   setConfig: (duration, killsToWin) => set({ duration, killsToWin }),
+  setMapId: (mapId) => set({ mapId }),
   setWinner: (winner) => set({ winner }),
   setMatchResult: (matchResult) => set({ matchResult }),
   reset: () => set(init),

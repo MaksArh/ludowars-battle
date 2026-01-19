@@ -42,10 +42,15 @@ class NakamaService {
     this._socket = null;
   }
 
-  async authenticateEmail(email: string, password: string, create = false) {
-    this._session = await this.client.authenticateEmail(email, password, create);
-    this.saveSession();
-    return this._session;
+  async authenticateEmail(email: string, password: string, create = false, username?: string) {
+    try {
+      this._session = await this.client.authenticateEmail(email, password, create, username);
+      this.saveSession();
+      return this._session;
+    } catch (e) {
+      console.error('[Nakama] authenticateEmail failed:', { email, create, username, error: e });
+      throw e;
+    }
   }
 
   async authenticateDevice() {

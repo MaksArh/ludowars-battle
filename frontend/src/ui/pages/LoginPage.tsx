@@ -5,7 +5,7 @@ import { AuthForm, FormField } from '@/ui/components';
 
 const FIELDS: FormField[] = [
   { name: 'email', label: 'Email', type: 'email' },
-  { name: 'password', label: 'Password', type: 'password' },
+  { name: 'password', label: 'Password (min 8 chars)', type: 'password' },
 ];
 
 export function LoginPage() {

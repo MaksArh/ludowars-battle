@@ -15,6 +15,7 @@ import {
   RemoteWeaponSwap,
   JumpData,
   RemoteJump,
+  FallDeathMessage,
   DamageEvent,
   KillEvent,
   PlayersListMessage,
@@ -282,6 +283,10 @@ class NetworkManager {
 
   sendJump(data: JumpData): void {
     this.send(OpCode.JUMP, data);
+  }
+
+  sendFallDeath(): void {
+    this.send(OpCode.FALL_DEATH, {} as FallDeathMessage);
   }
 
   sendReady(): void {
