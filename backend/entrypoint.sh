@@ -58,12 +58,18 @@ SERVER_KEY="${NAKAMA_SERVER_KEY:-ludowars_dev_key}"
 LOGGER_LEVEL="${NAKAMA_LOGGER_LEVEL:-INFO}"
 SOCKET_PORT="${NAKAMA_SOCKET_PORT:-${PORT:-7350}}"
 CONSOLE_PORT="${NAKAMA_CONSOLE_PORT:-7351}"
+CONFIG_PATH="${NAKAMA_CONFIG_PATH:-/nakama/data/nakama.yml}"
 
 echo "Running Nakama migrations..."
 /nakama/nakama migrate up --database.address "$DB_ADDR"
 
 echo "Starting Nakama..."
-exec /nakama/nakama \
+CONFIG_ARGS=""
+if [ -f "$CONFIG_PATH" ]; then
+  CONFIG_ARGS="--config $CONFIG_PATH"
+fi
+
+exec /nakama/nakama $CONFIG_ARGS \
   --name "${NAKAMA_NAME:-nakama}" \
   --database.address "$DB_ADDR" \
   --logger.level "$LOGGER_LEVEL" \
