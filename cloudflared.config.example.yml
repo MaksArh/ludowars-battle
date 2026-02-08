@@ -1,0 +1,18 @@
+
+
+# имя туннеля (после cloudflared tunnel create ...)
+tunnel: ludowars-back
+
+# путь к cred-файлу, который сгенерировал cloudflared
+credentials-file: /home/USER/.cloudflared/TUNNEL_UUID.json
+
+ingress:
+  # Вариант с собственным доменом
+  - hostname: api.example.com
+    service: http://localhost:7350
+
+  # Если домена нет и нужен trycloudflare
+  # - service: http://localhost:7350
+
+  # Запасной роут
+  - service: http_status:404

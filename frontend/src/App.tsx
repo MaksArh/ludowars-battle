@@ -1,31 +1,30 @@
-import { useState } from 'react';
-import './App.css';
-import { Button } from './components/Button';
-import { Counter } from './components/Counter';
+import { useEffect } from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { theme } from '@/ui/theme';
+import { AppRouter } from '@/router/AppRouter';
+import { useUserStore } from '@/store';
+import { LoadingScreen } from '@/ui/components';
 
-function App() {
-  const [count, setCount] = useState(0);
+export default function App() {
+  const { isLoading, restore } = useUserStore();
+
+  useEffect(() => {
+    restore();
+  }, [restore]);
+
+  if (isLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LoadingScreen />
+      </ThemeProvider>
+    );
+  }
 
   return (
-    <div className="app">
-      <h1>Ludowars Battle</h1>
-      <p className="description">2D Multiplayer Platform Shooter</p>
-
-      <Counter count={count} />
-
-      <div className="button-group">
-        <Button onClick={() => setCount((c) => c + 1)} variant="primary">
-          Increment
-        </Button>
-        <Button onClick={() => setCount((c) => c - 1)} variant="secondary">
-          Decrement
-        </Button>
-        <Button onClick={() => setCount(0)} variant="danger">
-          Reset
-        </Button>
-      </div>
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppRouter />
+    </ThemeProvider>
   );
 }
-
-export default App;

@@ -1,0 +1,1 @@
+export { useNavigateWithSound } from './useNavigateWithSound';
