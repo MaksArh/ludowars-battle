@@ -25,6 +25,9 @@
 - `VITE_NAKAMA_PORT`: `443`
 - `VITE_NAKAMA_SERVER_KEY`: ваш server key (если не задан — в коде есть дефолт `ludowars_dev_key`)
 
+Важно: если фронт деплоится **через Dockerfile**, эти переменные должны быть доступны **во время `docker build`**.
+В `frontend/Dockerfile.railway` они объявлены как `ARG` и прокидываются в `ENV`, поэтому в Railway UI добавьте их в **Build Args**.
+
 ### Команды
 Если Railway не подхватит автоматически:
 - **Build**: `npm ci && npm run build`
