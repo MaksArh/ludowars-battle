@@ -56,6 +56,8 @@ to_nakama_db_addr() {
 DB_ADDR="$(to_nakama_db_addr)"
 SERVER_KEY="${NAKAMA_SERVER_KEY:-ludowars_dev_key}"
 LOGGER_LEVEL="${NAKAMA_LOGGER_LEVEL:-INFO}"
+SOCKET_PORT="${NAKAMA_SOCKET_PORT:-${PORT:-7350}}"
+CONSOLE_PORT="${NAKAMA_CONSOLE_PORT:-7351}"
 
 echo "Running Nakama migrations..."
 /nakama/nakama migrate up --database.address "$DB_ADDR"
@@ -67,5 +69,7 @@ exec /nakama/nakama \
   --logger.level "$LOGGER_LEVEL" \
   --session.token_expiry_sec "${NAKAMA_SESSION_TOKEN_EXPIRY_SEC:-7200}" \
   --socket.server_key "$SERVER_KEY" \
+  --socket.port "$SOCKET_PORT" \
+  --console.port "$CONSOLE_PORT" \
   --runtime.path /nakama/data/modules
 
