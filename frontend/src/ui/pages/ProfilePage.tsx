@@ -28,7 +28,7 @@ export function ProfilePage() {
 
         const session = nakama.session;
         if (session) {
-          const result = await nakama.getClient().rpc(session, 'get_player_stats', '{}');
+          const result = await nakama.getClient().rpc(session, 'get_player_stats', {});
           if (result.payload) {
             const data = typeof result.payload === 'string' ? JSON.parse(result.payload) : result.payload;
             setStats(data as PlayerStats);

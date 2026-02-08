@@ -32,7 +32,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
 
   private lastJumpType: 'normal' | 'double' | null = null;
 
-  private hp = COMBAT.MAX_HP;
+  private hp: number = COMBAT.MAX_HP;
   private weapons: Weapon[] = [];
   private weaponIdx = 0;
   private invuln = false;
@@ -51,7 +51,7 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
   private nameText?: Phaser.GameObjects.Text;
   private hpBarBg?: Phaser.GameObjects.Rectangle;
   private hpBarFill?: Phaser.GameObjects.Rectangle;
-  private lastDisplayedHp = COMBAT.MAX_HP;
+  private lastDisplayedHp: number = COMBAT.MAX_HP;
 
   private shieldGraphic?: Phaser.GameObjects.Arc;
   private damageAura?: Phaser.GameObjects.Arc;
