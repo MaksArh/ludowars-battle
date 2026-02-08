@@ -17,6 +17,8 @@
 ### Важно про builder
 Если Railpack/Nixpacks не может корректно определить сборку (часто в монорепах), переключите **Frontend сервис на Docker builder** и укажите Dockerfile: `frontend/Dockerfile.railway`.
 
+Альтернатива (если Railway всё равно анализирует корень репо): в корне репозитория есть `package.json`, который делегирует `build/start` в `frontend/`. Тогда можно деплоить сервис вообще без Root Directory.
+
 ### Переменные окружения (Vite читает их на build-time)
 - `VITE_NAKAMA_HOST`: домен Nakama сервиса (например `xxx.up.railway.app`)
 - `VITE_NAKAMA_USE_SSL`: `true`
@@ -48,7 +50,12 @@
 - `NAKAMA_SERVER_KEY` (секрет)
 
 ### Start Command (миграции + запуск)
-В Railway UI для Nakama сервиса задайте **Start Command**:
+Вариант 1 (рекомендуется): **не задавать Start Command** в UI. В `backend/Dockerfile` уже добавлен `ENTRYPOINT` (`backend/entrypoint.sh`), который:
+- собирает строку подключения из `DATABASE_URL` или `PG*` или `NAKAMA_DB_*`
+- делает `nakama migrate up`
+- запускает Nakama с нужными флагами
+
+Вариант 2: в Railway UI для Nakama сервиса задать **Start Command** (если хотите управлять из UI):
 
 ```bash
 /bin/sh -ec '
