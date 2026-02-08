@@ -19,25 +19,13 @@ ensure_sslmode() {
 }
 
 to_nakama_db_addr() {
-  # Preferred: already in Nakama format: user:pass@host:port/db?sslmode=...
+  # Preferred: explicit Nakama DSN format: user:pass@host:port/db?sslmode=...
   if [ -n "${NAKAMA_DATABASE_ADDRESS:-}" ]; then
     ensure_sslmode "${NAKAMA_DATABASE_ADDRESS}"
     return
   fi
 
-  # Railway managed Postgres обычно даёт DATABASE_URL вида postgresql://user:pass@host:port/db?...
-  if [ -n "${DATABASE_URL:-}" ]; then
-    case "$DATABASE_URL" in
-      postgres://*|postgresql://*)
-        stripped="${DATABASE_URL#postgres://}"
-        stripped="${stripped#postgresql://}"
-        ensure_sslmode "$stripped"
-        return
-        ;;
-    esac
-  fi
-
-  # Fallback: PG* variables.
+  # Preferred on Railway: PG* variables (обычно уже корректно распарсены, без URL-энкодинга).
   if [ -n "${PGHOST:-}" ] && [ -n "${PGPORT:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGPASSWORD:-}" ] && [ -n "${PGDATABASE:-}" ]; then
     ensure_sslmode "${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
     return
@@ -47,6 +35,19 @@ to_nakama_db_addr() {
   if [ -n "${NAKAMA_DB_HOST:-}" ] && [ -n "${NAKAMA_DB_PORT:-}" ] && [ -n "${NAKAMA_DB_USER:-}" ] && [ -n "${NAKAMA_DB_PASSWORD:-}" ] && [ -n "${NAKAMA_DB_NAME:-}" ]; then
     ensure_sslmode "${NAKAMA_DB_USER}:${NAKAMA_DB_PASSWORD}@${NAKAMA_DB_HOST}:${NAKAMA_DB_PORT}/${NAKAMA_DB_NAME}"
     return
+  fi
+
+  # Last resort: Railway managed Postgres sometimes provides DATABASE_URL like postgresql://user:pass@host:port/db?...
+  # NOTE: user/pass may be URL-encoded in DATABASE_URL; prefer PG* vars if possible.
+  if [ -n "${DATABASE_URL:-}" ]; then
+    case "$DATABASE_URL" in
+      postgres://*|postgresql://*)
+        stripped="${DATABASE_URL#postgres://}"
+        stripped="${stripped#postgresql://}"
+        ensure_sslmode "$stripped"
+        return
+        ;;
+    esac
   fi
 
   echo "Database connection is not configured. Set one of: NAKAMA_DATABASE_ADDRESS, DATABASE_URL, PG* vars, or NAKAMA_DB_* vars."
@@ -59,6 +60,8 @@ LOGGER_LEVEL="${NAKAMA_LOGGER_LEVEL:-INFO}"
 SOCKET_PORT="${NAKAMA_SOCKET_PORT:-${PORT:-7350}}"
 CONSOLE_PORT="${NAKAMA_CONSOLE_PORT:-7351}"
 CONFIG_PATH="${NAKAMA_CONFIG_PATH:-/nakama/data/nakama.yml}"
+SOCKET_ADDR="${NAKAMA_SOCKET_ADDRESS:-0.0.0.0}"
+CONSOLE_ADDR="${NAKAMA_CONSOLE_ADDRESS:-0.0.0.0}"
 
 echo "Running Nakama migrations..."
 /nakama/nakama migrate up --database.address "$DB_ADDR"
@@ -75,7 +78,9 @@ exec /nakama/nakama $CONFIG_ARGS \
   --logger.level "$LOGGER_LEVEL" \
   --session.token_expiry_sec "${NAKAMA_SESSION_TOKEN_EXPIRY_SEC:-7200}" \
   --socket.server_key "$SERVER_KEY" \
+  --socket.address "$SOCKET_ADDR" \
   --socket.port "$SOCKET_PORT" \
+  --console.address "$CONSOLE_ADDR" \
   --console.port "$CONSOLE_PORT" \
   --runtime.path /nakama/data/modules
 
