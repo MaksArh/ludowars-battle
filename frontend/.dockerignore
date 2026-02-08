@@ -1,6 +1,14 @@
 node_modules
 dist
 .git
+.github
+*.log
+README*
+npm-debug.log*
+Dockerfile*
+node_modules
+dist
+.git
 *.log
 
 

@@ -14,6 +14,9 @@
 ### Root Directory
 - `frontend/`
 
+### Важно про builder
+Если Railpack/Nixpacks не может корректно определить сборку (часто в монорепах), переключите **Frontend сервис на Docker builder** и укажите Dockerfile: `frontend/Dockerfile.railway`.
+
 ### Переменные окружения (Vite читает их на build-time)
 - `VITE_NAKAMA_HOST`: домен Nakama сервиса (например `xxx.up.railway.app`)
 - `VITE_NAKAMA_USE_SSL`: `true`
